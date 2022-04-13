@@ -60,34 +60,21 @@ def bot_control():
         if np.isnan(sider2):
             sider2 = 3
 
-        front = np.concatenate((scd[300:360], scd[0:61]))
-        front = front[(front>0.01) & (front<3)]
-        if len(front)>0 and front.min()<0.115:
-            # Angular rotation incase front collision is imminent
-            rospy.loginfo("Head-on collision detected, rotating along z-axis")
-            if ef1>0:
-                vel_msg.linear.x = 0
-                vel_msg.angular.z = -0.5
-                pub.publish(vel_msg)
-                rospy.sleep(0.1)
-            else:
-                vel_msg.linear.x = 0
-                vel_msg.angular.z = 0.5
-                pub.publish(vel_msg)
-                rospy.sleep(0.1)
+        # Saving previous step data for differential controller
+        ei1 = ef1
+        ei2 = ef2
+        ef1 = sidel1-sider1
+        ef2 = sidel2-sider2
+        #rospy.loginfo("centering turtlebot")
+        vel_msg.linear.x = vx
+        # Angular rotation computation based on PD gains
+        if sidel1<0.5 or sider1<0.5:
+            z = -((ef1)*1.5 - (ef1 - ei1)*0.1)
         else:
-            # Saving previous step data for differential controller
-            ei1 = ef1
-            ei2 = ef2
-            ef1 = sidel1-sider1
-            ef2 = sidel2-sider2
-            #rospy.loginfo("centering turtlebot")
-            vel_msg.linear.x = vx
-            # Angular rotation computation based on PD gains
             z = -((ef1)*1 - (ef1 - ei1)*0.1 + (ef2)*0.8 - (ef2 - ei2)*0.1)
-            vel_msg.angular.z = z
-            pub.publish(vel_msg)
-            rospy.sleep(0.1)
+        vel_msg.angular.z = z
+        pub.publish(vel_msg)
+        rospy.sleep(0.1)
 
 if __name__ == "__main__":
     try:
