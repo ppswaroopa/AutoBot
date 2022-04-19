@@ -59,15 +59,14 @@ class LineFollower(object):
         cv2.circle(mask2,(int(cx2), int(cy2)), 10,(0,0,255),-1)
         cv2.imshow("Original", cv_image)
         cv2.imshow("MASK", mask)
-        cv2.imshow("MASK2", mask2)
+        #cv2.imshow("MASK2", mask2)
         cv2.waitKey(1)
 
         #################################
         ########   CONTROLLER    ########
         #################################
         
-        global cxlast
-        global cxlast2
+
         global cxlast_int
         # PD controller, works in gazebo to follow line relatively in centre
         twist_object = Twist()
@@ -76,28 +75,19 @@ class LineFollower(object):
         ############Extrapolation#########
         
         #x_int = cx - 21.8*(cx2 - cx)
-        x_int = cx - 21.8*(cx2 - cx)
+        x_int = cx - 21.4*(cx2 - cx)
         ############################
 
-        #p = max(-0.5, min(0.5, ((width/2) - cx)/3000))
-        #p2 = max(-2.5, min(2.5, ((width/2) - cx2)/3000))
+      
         p = max(-0.28, min(0.28, ((width/2) - x_int)/3000))
         
-        
         d = max(-0.28, min(0.28, (cxlast_int-x_int)/(time() - lasttime)*1.2*1e7))
-        #d2 = max(-0.5, min(0.5, (cxlast2-cx2)/(time() - lasttime)*1.2*1e7))
-
-        #if abs(cx-cx2)<5:
-            #twist_object.angular.z = p+d
-        #else:
-            #twist_object.angular.z = p2+d2
-        
+     
         twist_object.angular.z = p+d
         
         print(f"{x_int=}\t{cx=}\t{cx2=}\t{p=}\{d=}")
 
-        cxlast = cx
-        cxlast2 = cx2
+        
         cxlast_int = x_int
         # end controller
         rospy.loginfo("ANGULAR VALUE SENT===>"+str(twist_object.angular.z))
@@ -125,7 +115,5 @@ def main():
 
 if __name__ == '__main__':
         lasttime = 0
-        cxlast = 0
-        cxlast2 = 0
         cxlast_int = 0
         main()
