@@ -1,0 +1,10 @@
+<launch>
+
+  <node pkg="aue_finals" type="stop_sign.py" name="stop_sign" output="screen"/>
+  
+
+</launch>
+
+
+
+
