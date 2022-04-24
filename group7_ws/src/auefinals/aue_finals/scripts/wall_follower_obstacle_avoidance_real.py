@@ -20,8 +20,8 @@ class ObstacleAvoidance():
         vel_msg = Twist()
         ef1 = 0
         ef2 = 0
-
         while not rospy.is_shutdown():
+
             # Front ahead distance measurement with noise filtering and respective ranges
             front1 = np.concatenate((self.scd[355:360], self.scd[0:6]))
             front1 = front1[(front1>0.01) & (front1<1)]
@@ -77,7 +77,7 @@ class ObstacleAvoidance():
                 z = -((ef1)*1.5 - (ef1 - ei1)*0.1)            
             else:
                 #rospy.loginfo("rotation turtlebot")
-                z = -((ef1)*1 - (ef1 - ei1)*0.1 + (ef2)*0.8 - (ef2 - ei2)*0.1)
+                z = -((ef1)*1.25 - (ef1 - ei1)*0.1 + (ef2)*0.8 - (ef2 - ei2)*0.1)
             vel_msg.angular.z = z
             pub.publish(vel_msg)
             rospy.sleep(0.1)
