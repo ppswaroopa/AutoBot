@@ -1,0 +1,30 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <model name="apriltag">
+    <static>true</static>
+    <link name="box">
+      <pose>0 0 0 0 0 0</pose>
+      <collision name="collision">
+        <geometry>
+          <box>
+            <size>0.21 0.025 0.21</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="visual">
+        <geometry>
+          <box>
+            <size>0.21 0.025 0.21</size>
+          </box>
+        </geometry>
+        <material>
+          <script>
+            <uri>model://apriltag/materials/scripts</uri>
+            <uri>model://apriltag/materials/textures</uri>
+            <name>apriltag</name>
+          </script>
+        </material>
+      </visual>
+    </link>    
+  </model>
+</sdf>
