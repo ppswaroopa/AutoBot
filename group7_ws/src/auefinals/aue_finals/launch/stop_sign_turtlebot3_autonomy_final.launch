@@ -1,7 +1,7 @@
 <launch>
 
   <node pkg="aue_finals" type="stop_sign.py" name="stop_sign" output="screen"/>
-  
+  <include file="$(find aue_finals)/launch/yolo_v2_tiny.launch" />
 
 </launch>
 
