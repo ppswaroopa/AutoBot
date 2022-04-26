@@ -1,0 +1,23 @@
+<launch>
+
+  
+  <include file="$(find aue_finals)/launch/continuous_detection.launch"/>
+
+
+  <!--<node pkg="aue_finals" type="wall_follower_obstacle_avoidance.py" name="bot_controller" output="screen" />-->
+  <node pkg="aue_finals" type="AutonomousBot_real.py" name="autobot" output="screen" />
+  
+  <include file="$(find aue_finals)/launch/yolo_v2_tiny.launch" />
+  
+  <!--<node name="rviz" pkg="rviz" type="rviz" args="-d $(find turtlebot3_gazebo)/rviz/turtlebot3_gazebo_model.rviz"/>-->
+    
+    
+  <!--<node pkg="aue_finals" type="stop_sign.py" name="stop_sign" />-->
+  
+  
+ 
+</launch>
+
+
+
+

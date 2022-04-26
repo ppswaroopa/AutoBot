@@ -2,10 +2,10 @@
 
   <arg name="model" default="$(env TURTLEBOT3_MODEL)" doc="model type [burger, waffle, waffle_pi]"/>
   <arg name="multi_robot_name" default=""/>
-  <arg name="x_pos" default="-0.34"/>
-  <arg name="y_pos" default="-1.75"/>
+  <arg name="x_pos" default="-0.2"/>
+  <arg name="y_pos" default="1.6"/>
   <arg name="z_pos" default="0"/>  
-  <arg name="yaw_pos" default="0"/>
+  <arg name="yaw_pos" default="3.14"/>
 
 
 
@@ -42,7 +42,7 @@
   <!--<node pkg="aue_finals" type="wall_follower_obstacle_avoidance.py" name="bot_controller" output="screen" />-->
   <node pkg="aue_finals" type="AutonomousBot.py" name="autobot" output="screen" />
   
-  <include file="$(find darknet_ros)/launch/yolo_v3.launch" />
+  <include file="$(find aue_finals)/launch/yolo_v2_tiny.launch" />
   
   <!--<node name="rviz" pkg="rviz" type="rviz" args="-d $(find turtlebot3_gazebo)/rviz/turtlebot3_gazebo_model.rviz"/>-->
     
