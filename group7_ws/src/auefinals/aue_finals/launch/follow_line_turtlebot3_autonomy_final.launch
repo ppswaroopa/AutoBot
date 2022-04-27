@@ -39,9 +39,7 @@
 
   <!--<node name="rviz" pkg="rviz" type="rviz" args="-d $(find turtlebot3_gazebo)/rviz/turtlebot3_gazebo_model.rviz"/>-->
   
-  <node pkg="aue_finals" type="follow_line_stop_sign.py" name="line_following_node" />
-
-  <include file="$(find darknet_ros)/launch/yolo_v3.launch" />
+  <node pkg="aue_finals" type="2follow_line.py" name="line_following_node" />
   
 </launch>
 

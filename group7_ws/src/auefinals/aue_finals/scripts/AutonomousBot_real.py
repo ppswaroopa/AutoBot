@@ -24,7 +24,7 @@ class TurtleBot(object):
         self.bridge_object = CvBridge()
         rospy.Subscriber("/raspicam_node/image",Image,self.camera_callback)
         # rospy.Subscriber("/scan", LaserScan, self.update_scan)
-        # rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes , self.yolo_detection_flag)
+        rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes , self.yolo_detection_flag)
         rospy.Subscriber("/scan", LaserScan, callback=self.obstacle_avoidance)
 
         # For AprilTag
@@ -226,14 +226,14 @@ class TurtleBot(object):
 
             # We get image dimensions and crop the parts of the image we dont need
             height, width, channels = cv_image.shape
-            crop_img = cv_image
+            crop_img = cv_image[int(height/2):int(height)][1:int(width)]
 
             # Convert from RGB to HSV
             hsv = cv2.cvtColor(crop_img, cv2.COLOR_BGR2HSV)
 
             # Threshold the HSV image to get only yellow colors
-            lower_yellow = np.array([15, 45, 65])
-            upper_yellow = np.array([45, 130, 200])
+            lower_yellow = np.array([15, 45, 30])
+            upper_yellow = np.array([45, 130, 220])
 
             # 38, 20.4, 97
             # 33.5, 140, 105
