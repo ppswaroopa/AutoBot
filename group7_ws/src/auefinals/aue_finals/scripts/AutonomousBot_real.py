@@ -10,7 +10,7 @@ from sensor_msgs.msg import LaserScan
 from darknet_ros_msgs.msg import BoundingBoxes
 from apriltag_ros.msg import AprilTagDetectionArray
 
-from cv_bridge import CvBridge, CvBridgeError
+from cv_bridge import CvBridge
 from move_robot import MoveTurtlebot3
 from time import time
 
@@ -22,53 +22,58 @@ class TurtleBot(object):
         rospy.loginfo("TurtleBot Initialization Started")
 
         self.bridge_object = CvBridge()
-        rospy.Subscriber("/raspicam_node/image",Image,self.camera_callback)
-        # rospy.Subscriber("/scan", LaserScan, self.update_scan)
-        rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes , self.yolo_detection_flag)
-        rospy.Subscriber("/scan", LaserScan, callback=self.obstacle_avoidance)
 
-        # For AprilTag
-        self.april_tag_sub = rospy.Subscriber("/tag_detections", AprilTagDetectionArray, self.april_tag_callback)
-        self.apriltagdetected = False
+        rospy.Subscriber("/raspicam_node/image", Image, self.line_follower)
+        rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.stop_sign_detector)
+        rospy.Subscriber("/scan", LaserScan, self.obstacle_avoidance)
+        rospy.Subscriber("/tag_detections", AprilTagDetectionArray, self.april_tag_detector)
+        
+        self.pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
+
+        # Initialize objects
+        self.moveTurtlebot3_object = MoveTurtlebot3()
         self.cmd = Twist()
 
-        self.pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
-        self.moveTurtlebot3_object = MoveTurtlebot3()
-        self.yolo = True
-        self.front = 0
+        # Initialize internal variables
+        self.apriltagdetected   =   False   #  Flag for April Tag Detection
+        self.yolo               =   True    #  Flag for Stop Sign Detection using TinyYOLO
+        self.whos_publishing    =   0       #  Flag for Controller Selection
 
-        self.cxlast_int = 0
-        self.lasttime = 0
-        self.whos_publishing = 0
+        self.front              =   0       # For Stop Sign Detection
+        self.cxlast_int         =   0       # For Line Follwer
+        self.lasttime           =   0       # For Line Follwer
+        
+        self.ef1                =   0       # For Obstacle Avoidance
+        self.ef2                =   0       # For Obstacle Avoidance
 
         rospy.loginfo("TurtleBot Initialization Finished")
 
-        
-        # number    who
-        # 0         obstacle avoidance
-        # 1         line following
-        # 2         apriltag
-        # 3         YOLO
+        # Number    Controller
+        # 0         obstacle_avoidance
+        # 1         line_follower
+        # 2         april_tag_detector
+        # 3         stop_sign_detector
 
     def clip(self, val, mx, mn=None):
-    # clip val to range (mn, mx)
-    # if mn not defined, clip val to range (-mx, mx)
+        # Helper function for April Tag
+        # clip val to range (mn, mx)
+        # if mn not defined, clip val to range (-mx, mx)
         if mn == None:
             return max(-mx, min(val, mx))
         return max(mn, min(val, mx))
 
-    def april_tag_callback(self, data):
-        # update data in case apriltag is detected
+    def april_tag_detector(self, data):
+        # April Tag Follower that is activated upon positive detection.
+
+        # Only works after the controller has stopped for STOP sign
+        
         # if no apriltag detected, make bool false, so botcontrol() is used instead
-        # print(data.detections)
-        # rospy.loginfo(data.detections[0].pose.pose.pose.position.x)
         if (len(data.detections) > 0) and (self.yolo == False):
-            # rospy.loginfo(data.detections[0].pose.pose.pose.position.x)
             rospy.loginfo("April Tag Detected")
 
             self.whos_publishing = 2
 
-            # make target 
+            # Acquire Target
             at_x = data.detections[0].pose.pose.pose.position.x
             at_z = data.detections[0].pose.pose.pose.position.z
 
@@ -76,69 +81,60 @@ class TurtleBot(object):
             v_mul = 1.2
             a_max = 1
             a_mul = 1.4
-
             distance_target = 0.5
             
-            # define and calculate message
+            # Calculate Linear and Angular Velocity
             self.cmd.linear.x = self.clip((at_z-distance_target)*v_mul, v_max)
             self.cmd.angular.z = self.clip(-at_x*a_mul, a_max)
 
             # Make it start turning
             self.pub.publish(self.cmd)
-        
-        # elif self.whos_publishing == 2:
-        #     # if apriltag isnt detected anymore, stop and give up control
-        #     self.apriltagdetected = 0
-        #     # self.cmd.linear.x = 0
-        #     # self.cmd.angular.z = 0
-        #     # self.pub.publish(self.cmd)
 
-    def yolo_detection_flag(self, data):
-        rospy.loginfo("YOLO Processing")
-        vel_msg = Twist()
+    def stop_sign_detector(self, data):
+        # Stop Sign Detector; gets called when there is a bounding box
+        
         if self.yolo:
-            self.moveTurtlebot3_object.move_robot(vel_msg)
+            rospy.loginfo("YOLO Processing")
+            stop_for_sign = False
             for box in data.bounding_boxes:
                 if box.Class == "stop sign":
                     rospy.loginfo("STOP SIGN Detected")
-                    rospy.loginfo(self.front)
-                    if np.mean(self.front) < 1:
+                    rospy.loginfo(np.min(self.front))
+                    # stop_for_sign = True
+                    if (np.mean(self.front) < 0.75) and (np.mean(self.front) > 0.5): # At the entrance value of mean is 0.27
 
                         self.whos_publishing = 3
 
                         rospy.loginfo("Stopping for STOP SIGN")
                         start = time()
                         while (time() - start) < 3:
-                            vel_msg.linear.x = 0.0
-                            vel_msg.angular.z = 0.0
-                            # rospy.loginfo(vel_msg)
-                            # self.moveTurtlebot3_object.move_robot(vel_msg)
-                            self.pub.publish(vel_msg)
+                            self.cmd.linear.x = 0.0
+                            self.cmd.angular.z = 0.0
+                            self.pub.publish(self.cmd)
                         # back into line following mode
 
                         self.whos_publishing = 1
-
-                        self.yolo = False
                         rospy.loginfo("Proceeding from STOP SIGN")
+                        self.yolo = False #  Once stopped for STOP SIGN, the program will stop processing
 
     def obstacle_avoidance(self, scan_data):
+        # Obstacle Avoidance based on LiDAR
         
-        vel_msg = Twist()
-        ef1 = 0
-        ef2 = 0
-        self.scd = scan_data.ranges
-        scn = np.concatenate((self.scd[315:360], self.scd[0:45]))
+        scd = scan_data.ranges
 
+        # Calculating frontal values for STOP SIGN Detection
+        scn = np.concatenate((scd[300:360], scd[0:30]))
+        # scn = np.array(scd[270:360])
         self.front = scn[(scn>0.01) & (scn<3)]
         
         if self.whos_publishing == 0:
-            rospy.loginfo('Working: Obstacle Avoidance Controller')
+            # rospy.loginfo('Working: Obstacle Avoidance Controller')
             # Front ahead distance measurement with noise filtering and respective ranges
-            front1 = np.concatenate((self.scd[355:360], self.scd[0:6]))
+            front1 = np.concatenate((scd[355:360], scd[0:6]))
             front1 = front1[(front1>0.01) & (front1<1)]
-            front2 = np.concatenate((self.scd[350:355], self.scd[6:11]))
+            front2 = np.concatenate((scd[350:355], scd[6:11]))
             front2 = front2[(front2>0.01) & (front2<0.51)]
-            front3 = np.concatenate((self.scd[340:350], self.scd[11:21]))
+            front3 = np.concatenate((scd[340:350], scd[11:21]))
             front3 = front3[(front3>0.01) & (front3<0.265)]
 
             # Dynamic velocity computation
@@ -152,10 +148,10 @@ class TurtleBot(object):
                 vx = 0.22
 
             # Sectoring the front lidar scan into 4 sectors with noise filtering
-            sidel1 = np.array(self.scd[315:360])
-            sidel2 = np.array(self.scd[270:315])
-            sider1 = np.array(self.scd[0:46])
-            sider2 = np.array(self.scd[46:91])
+            sidel1 = np.array(scd[315:360])
+            sidel2 = np.array(scd[270:315])
+            sider1 = np.array(scd[0:46])
+            sider2 = np.array(scd[46:91])
             sidel1 = sidel1[(sidel1>0.01) & (sidel1<3)].mean()
             sidel2 = sidel2[(sidel2>0.01) & (sidel2<3)].mean()
             sider1 = sider1[(sider1>0.01) & (sider1<3)].mean()
@@ -172,27 +168,26 @@ class TurtleBot(object):
                 sider2 = 3
 
             # Saving previous step data for differential controller
-            ei1 = ef1
-            ei2 = ef2
-            ef1 = sidel1-sider1
-            ef2 = sidel2-sider2
+            ei1 = self.ef1
+            ei2 = self.ef2
+            self.ef1 = sidel1-sider1
+            self.ef2 = sidel2-sider2
             
             if len(front3)>0:
-                vel_msg.linear.x = 0            
+                self.cmd.linear.x = 0            
             else:
-                vel_msg.linear.x = vx
+                self.cmd.linear.x = vx
 
             # Angular rotation computation based on PD gains
             if sidel1<0.5 or sider1<0.5:
-                #rospy.loginfo("centering turtlebot")
-                z = -((ef1)*1.5 - (ef1 - ei1)*0.1)            
+                z = -((self.ef1)*1.5 - (self.ef1 - ei1)*0.1)            
             else:
-                #rospy.loginfo("rotation turtlebot")
-                z = -((ef1)*1 - (ef1 - ei1)*0.1 + (ef2)*0.8 - (ef2 - ei2)*0.1)
-            vel_msg.angular.z = z
-            self.pub.publish(vel_msg)
+                z = -((self.ef1)*1 - (self.ef1 - ei1)*0.1 + (self.ef2)*0.8 - (self.ef2 - ei2)*0.1)
+            
+            self.cmd.angular.z = z
+            self.pub.publish(self.cmd)
 
-    def line_follower_func(self, cx, cx2, width):
+    def line_follower_controller(self, cx, cx2, width):
 
         self.whos_publishing = 1
 
@@ -216,8 +211,9 @@ class TurtleBot(object):
 
         self.pub.publish(twist_object)
 
-    def camera_callback(self, data):
-        # rospy.loginfo("CAMERA")
+    def line_follower(self, data):
+        # Line Following using Camera
+
         self.line_follower = False
         # Check for blob formation in whole image
         if not self.line_follower:
@@ -283,7 +279,7 @@ class TurtleBot(object):
                     #cv2.imshow("MASK2", mask2)
                     cv2.waitKey(1)
 
-                    self.line_follower_func(cx,cx,width)
+                    self.line_follower_controller(cx,cx,width)
 
                 elif m['m00'] != 0:
                     rospy.loginfo("Line Following using Cropped Image Blob")
@@ -302,32 +298,33 @@ class TurtleBot(object):
                     #cv2.imshow("MASK2", mask2)
                     cv2.waitKey(1)
 
-                    self.line_follower_func(cx,cx2,width)
+                    self.line_follower_controller(cx,cx2,width)
                     
     def clean_up(self):
         self.moveTurtlebot3_object.clean_class()
-        # cv2.destroyAllWindows()
+        cv2.destroyAllWindows()
 
 def main():
     rospy.init_node('autobot', anonymous=True) # Initialize the node
 
-    line_follower_object = TurtleBot() # Create object of the main class
+    tb3_burger = TurtleBot() # Create object of the main class
     rate = rospy.Rate(5)
+
     ctrl_c = False
     def shutdownhook():
         # Works better than rospy.is_shutdown()
-        line_follower_object.clean_up()
+        tb3_burger.clean_up()
         rospy.loginfo("Shutdown time!")
         ctrl_c = True
+
     rospy.on_shutdown(shutdownhook)
+
     while not ctrl_c:
-        # rospy.loginfo(line_follower_object.whos_publishing)
+        # rospy.loginfo(tb3_burger.whos_publishing)
         rate.sleep()
 
 if __name__ == '__main__':
         try:
-            lasttime = 0
-            cxlast_int = 0
             main()
         except rospy.ROSInterruptException:
             pass

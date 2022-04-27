@@ -100,23 +100,22 @@ class TurtleBot(object):
                 if box.Class == "stop sign":
                     rospy.loginfo("STOP SIGN Detected")
                     rospy.loginfo(np.min(self.front))
-                    stop_for_sign = True
-                if np.min(self.front) < 0.5 and stop_for_sign:
+                    # stop_for_sign = True
+                    if (np.mean(self.front) < 0.75) and (np.mean(self.front) > 0.5): # At the entrance value of mean is 0.27
 
-                    self.whos_publishing = 3
+                        self.whos_publishing = 3
 
-                    rospy.loginfo("Stopping for STOP SIGN")
-                    start = time()
-                    while (time() - start) < 3:
-                        self.cmd.linear.x = 0.0
-                        self.cmd.angular.z = 0.0
-                        self.pub.publish(self.cmd)
-                    # back into line following mode
+                        rospy.loginfo("Stopping for STOP SIGN")
+                        start = time()
+                        while (time() - start) < 3:
+                            self.cmd.linear.x = 0.0
+                            self.cmd.angular.z = 0.0
+                            self.pub.publish(self.cmd)
+                        # back into line following mode
 
-                    self.whos_publishing = 1
-                    rospy.loginfo("Proceeding from STOP SIGN")
-                    self.yolo = False #  Once stopped for STOP SIGN, the program will stop processing
-                        
+                        self.whos_publishing = 1
+                        rospy.loginfo("Proceeding from STOP SIGN")
+                        self.yolo = False #  Once stopped for STOP SIGN, the program will stop processing
 
     def obstacle_avoidance(self, scan_data):
         # Obstacle Avoidance based on LiDAR
@@ -124,12 +123,12 @@ class TurtleBot(object):
         scd = scan_data.ranges
 
         # Calculating frontal values for STOP SIGN Detection
-        # scn = np.concatenate((scd[270:360], scd[0:45]))
-        scn = np.array(scd[270:360])
+        scn = np.concatenate((scd[300:360], scd[0:30]))
+        # scn = np.array(scd[270:360])
         self.front = scn[(scn>0.01) & (scn<3)]
         
         if self.whos_publishing == 0:
-            rospy.loginfo('Working: Obstacle Avoidance Controller')
+            # rospy.loginfo('Working: Obstacle Avoidance Controller')
             # Front ahead distance measurement with noise filtering and respective ranges
             front1 = np.concatenate((scd[355:360], scd[0:6]))
             front1 = front1[(front1>0.01) & (front1<1)]
@@ -269,7 +268,7 @@ class TurtleBot(object):
                 
                 # if m['m00'] == 0 or m2['m00'] == 0:
                 if m['m00'] == 0:
-                    rospy.loginfo("Line Following using Full Image Blob")
+                    # rospy.loginfo("Line Following using Full Image Blob")
                     # use the values from the full image
                     cx, cy = m_main['m10']/m_main['m00'], m_main['m01']/m_main['m00']
 
@@ -283,7 +282,7 @@ class TurtleBot(object):
                     self.line_follower_controller(cx,cx,width)
 
                 elif m['m00'] != 0:
-                    rospy.loginfo("Line Following using Cropped Image Blob")
+                    # rospy.loginfo("Line Following using Cropped Image Blob")
                     # elif m['m00'] != 0 and m2['m00'] != 0:
                     cx, cy = m['m10']/m['m00'], m['m01']/m['m00']
                     if m2['m00'] !=0 :
