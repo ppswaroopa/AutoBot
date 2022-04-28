@@ -66,7 +66,7 @@ class TurtleBot(object):
         # April Tag Follower that is activated upon positive detection.
         # Only works after the controller has stopped for STOP sign
         # if no apriltag detected, make bool false, so botcontrol() is used instead
-        if (len(data.detections) > 0) and (self.yolo == False):
+        if (len(data.detections) > 0) and (self.yolo == False) and self.whos_publishing == 2:
             rospy.loginfo("April Tag Detected")
 
             # Acquire Target
@@ -89,7 +89,7 @@ class TurtleBot(object):
     def stop_sign_detector(self, data):
         # Stop Sign Detector; gets called when there is a bounding box
         
-        if self.yolo:
+        if self.yolo and self.whos_publishing == 3:
             rospy.loginfo("YOLO Processing")
             for box in data.bounding_boxes:
                 if box.Class == "stop sign":
@@ -229,7 +229,7 @@ class TurtleBot(object):
         rospy.loginfo(white_sum)
 
         # count pixels, if not noise, but actually line potentially
-        if white_sum > 30000:
+        if white_sum > 30000 and self.whos_publishing == 1:
 
             crop_img = hsv[int(height*.8):int(height)][1:int(width)]
             crop_img2 = hsv[int(height*.9):int(height)][1:int(width)]
