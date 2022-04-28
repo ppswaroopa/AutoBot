@@ -14,6 +14,7 @@ from cv_bridge import CvBridge
 from move_robot import MoveTurtlebot3
 from time import time
 
+# rosrun image_transport republish compressed in:=raspicam_node/image raw out:=raspicam_node/image/better
 
 
 class TurtleBot(object):
@@ -23,7 +24,7 @@ class TurtleBot(object):
 
         self.bridge_object = CvBridge()
 
-        rospy.Subscriber("/raspicam_node/image", Image, self.line_follower)
+        # rospy.Subscriber("/raspicam_node/image/better", Image, self.line_follower)
         rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.stop_sign_detector)
         rospy.Subscriber("/scan", LaserScan, self.obstacle_avoidance)
         rospy.Subscriber("/tag_detections", AprilTagDetectionArray, self.april_tag_detector)
@@ -31,7 +32,6 @@ class TurtleBot(object):
         self.pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
 
         # Initialize objects
-        self.moveTurtlebot3_object = MoveTurtlebot3()
         self.cmd = Twist()
 
         # Initialize internal variables
@@ -39,7 +39,7 @@ class TurtleBot(object):
         self.yolo               =   True    #  Flag for Stop Sign Detection using TinyYOLO
         self.whos_publishing    =   0       #  Flag for Controller Selection
 
-        self.front              =   0       # For Stop Sign Detection
+        self.stop_sign_distance              =   0       # For Stop Sign Detection
         self.cxlast_int         =   0       # For Line Follwer
         self.lasttime           =   0       # For Line Follwer
         
@@ -64,12 +64,13 @@ class TurtleBot(object):
 
     def april_tag_detector(self, data):
         # April Tag Follower that is activated upon positive detection.
-
         # Only works after the controller has stopped for STOP sign
-        
         # if no apriltag detected, make bool false, so botcontrol() is used instead
-        if (len(data.detections) > 0) and (self.yolo == False):
-            rospy.loginfo("April Tag Detected")
+        
+        # if (len(data.detections) > 0) and (self.yolo == False):
+        # if len(data.detections) > 0:
+        if len(data.detections) > 0 and self.whos_publishing != 3:
+            rospy.loginfo("April T ag Detected")
 
             self.whos_publishing = 2
 
@@ -90,45 +91,48 @@ class TurtleBot(object):
             # Make it start turning
             self.pub.publish(self.cmd)
 
+        elif self.whos_publishing == 2:
+            self.whos_publishing = 0
+
     def stop_sign_detector(self, data):
         # Stop Sign Detector; gets called when there is a bounding box
         
         if self.yolo:
             rospy.loginfo("YOLO Processing")
-            stop_for_sign = False
             for box in data.bounding_boxes:
                 if box.Class == "stop sign":
                     rospy.loginfo("STOP SIGN Detected")
-                    rospy.loginfo(np.min(self.front))
-                    # stop_for_sign = True
-                    if (np.mean(self.front) < 0.75) and (np.mean(self.front) > 0.5): # At the entrance value of mean is 0.27
+                    rospy.loginfo(np.min(self.stop_sign_distance))
+                    if (np.mean(self.stop_sign_distance) < 0.75) and (np.mean(self.stop_sign_distance) > 0.5): # At the entrance value of mean is 0.27                        
+                        
+                        self.whos_publishing = 3                    # need to stop for sign, take over control
 
-                        self.whos_publishing = 3
-
+                        # wait 3 seconds
                         rospy.loginfo("Stopping for STOP SIGN")
                         start = time()
                         while (time() - start) < 3:
                             self.cmd.linear.x = 0.0
                             self.cmd.angular.z = 0.0
                             self.pub.publish(self.cmd)
-                        # back into line following mode
 
-                        self.whos_publishing = 1
+                        
+                        self.whos_publishing = 1        # back into line following mode
                         rospy.loginfo("Proceeding from STOP SIGN")
                         self.yolo = False #  Once stopped for STOP SIGN, the program will stop processing
 
     def obstacle_avoidance(self, scan_data):
         # Obstacle Avoidance based on LiDAR
-        
+        ts = time()
+
         scd = scan_data.ranges
 
         # Calculating frontal values for STOP SIGN Detection
         scn = np.concatenate((scd[300:360], scd[0:30]))
         # scn = np.array(scd[270:360])
-        self.front = scn[(scn>0.01) & (scn<3)]
+        self.stop_sign_distance = scn[(scn>0.01) & (scn<3)]
         
         if self.whos_publishing == 0:
-            # rospy.loginfo('Working: Obstacle Avoidance Controller')
+            rospy.loginfo('Working: Obstacle Avoidance Controller')
             # Front ahead distance measurement with noise filtering and respective ranges
             front1 = np.concatenate((scd[355:360], scd[0:6]))
             front1 = front1[(front1>0.01) & (front1<1)]
@@ -173,6 +177,7 @@ class TurtleBot(object):
             self.ef1 = sidel1-sider1
             self.ef2 = sidel2-sider2
             
+            
             if len(front3)>0:
                 self.cmd.linear.x = 0            
             else:
@@ -186,6 +191,7 @@ class TurtleBot(object):
             
             self.cmd.angular.z = z
             self.pub.publish(self.cmd)
+        rospy.loginfo(time() - ts)
 
     def line_follower_controller(self, cx, cx2, width):
 
@@ -194,7 +200,7 @@ class TurtleBot(object):
         # PD controller, works in gazebo to follow line relatively in centre
         twist_object = Twist()
         twist_object.linear.x = 0.1
-
+        cx2 = cx
         #######Extrapolation########
         x_int = cx - 3*(cx2 - cx)
         ############################
@@ -214,94 +220,99 @@ class TurtleBot(object):
     def line_follower(self, data):
         # Line Following using Camera
 
-        self.line_follower = False
         # Check for blob formation in whole image
-        if not self.line_follower:
-            # We select bgr8 because its the OpneCV encoding by default
-            cv_image = self.bridge_object.imgmsg_to_cv2(data, desired_encoding="bgr8")
+        # We select bgr8 because its the OpneCV encoding by default
+        cv_image = self.bridge_object.imgmsg_to_cv2(data, desired_encoding="bgr8")
 
-            # We get image dimensions and crop the parts of the image we dont need
-            height, width, channels = cv_image.shape
-            crop_img = cv_image[int(height/2):int(height)][1:int(width)]
+        # We get image dimensions and crop the parts of the image we dont need
+        height, width, channels = cv_image.shape
 
-            # Convert from RGB to HSV
-            hsv = cv2.cvtColor(crop_img, cv2.COLOR_BGR2HSV)
+        # Convert from RGB to HSV
+        hsv = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
 
-            # Threshold the HSV image to get only yellow colors
-            lower_yellow = np.array([15, 45, 30])
-            upper_yellow = np.array([45, 130, 220])
+        crop_img = hsv[int(height/2):int(height)][1:int(width)]
 
-            # 38, 20.4, 97
-            # 33.5, 140, 105
-            # 27, 64, 77
-            # 33, 125, 77
+        # Threshold the HSV image to get only yellow colors
+        lower_yellow = np.array([21, 35, 40])
+        upper_yellow = np.array([97, 154, 204])
 
+        # 38, 20.4, 97
+        # 33.5, 140, 105
+        # 27, 64, 77
+        # 33, 125, 77
 
-            mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
+        mask = cv2.inRange(crop_img, lower_yellow, upper_yellow)
+        white_sum = int(np.sum(mask)/255)
+        rospy.loginfo(white_sum)
+
+        # count pixels, if not noise, but actually line potentially
+        if white_sum > 30000:
+
+            # # Calculate centroid of the blob of binary image using ImageMoments
+            # m_main = cv2.moments(mask, False)
+
+            # if m_main['m00'] == 0:                  # if moment is not empty
+            #     if self.whos_publishing == 1:       
+            #         self.whos_publishing = 0
+
+            # elif m_main['m00'] != 0:
+            
+            crop_img = hsv[int(height*.8):int(height)][1:int(width)]
+            crop_img2 = hsv[int(height*.9):int(height)][1:int(width)]
+
+            mask = cv2.inRange(crop_img, lower_yellow, upper_yellow)
+            mask2 = cv2.inRange(crop_img2, lower_yellow, upper_yellow)
 
             # Calculate centroid of the blob of binary image using ImageMoments
-            m_main = cv2.moments(mask, False)
-
-            if m_main['m00'] == 0:
-                # self.line_follower = False
-                self.whos_publishing = 0
-                pass
-            elif m_main['m00'] != 0:
-                crop_img = cv_image[int(height*.8):int(height)][1:int(width)]
-                crop_img2 = cv_image[int(height*.9):int(height)][1:int(width)]
-
-                # Convert from RGB to HSV
-                hsv = cv2.cvtColor(crop_img, cv2.COLOR_BGR2HSV)
-                hsv2 = cv2.cvtColor(crop_img2, cv2.COLOR_BGR2HSV)
-
-                # Define the Yellow Colour in HSV
-                # lower_yellow = np.array([27,20,77])
-                # upper_yellow = np.array([38,140,105])
-
-                mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
-                mask2 = cv2.inRange(hsv2, lower_yellow, upper_yellow)
-
-                # Calculate centroid of the blob of binary image using ImageMoments
-                m = cv2.moments(mask, False)
-                m2 = cv2.moments(mask2, False)
-                
-                
+            m = cv2.moments(mask, False)
+            m2 = cv2.moments(mask2, False)
+            
                 # if m['m00'] == 0 or m2['m00'] == 0:
-                if m['m00'] == 0:
-                    rospy.loginfo("Line Following using Full Image Blob")
-                    # use the values from the full image
-                    cx, cy = m_main['m10']/m_main['m00'], m_main['m01']/m_main['m00']
+            # if m['m00'] == 0:
 
-                    cv2.circle(mask,(int(cx), int(cy)), 10,(0,0,255),-1)
-                    # cv2.circle(mask2,(int(cx2), int(cy2)), 10,(0,0,255),-1)
-                    # cv2.imshow("Original", cv_image)
-                    cv2.imshow("MASK", mask)
-                    #cv2.imshow("MASK2", mask2)
-                    cv2.waitKey(1)
+            #     rospy.loginfo("Line Following using Full Image Blob")
+            #     # use the values from the full image
+            #     cx, cy = m_main['m10']/m_main['m00'], m_main['m01']/m_main['m00']
 
-                    self.line_follower_controller(cx,cx,width)
+            #     cv2.circle(mask,(int(cx), int(cy)), 10,(0,0,255),-1)
+            #     # cv2.circle(mask2,(int(cx2), int(cy2)), 10,(0,0,255),-1)
+            #     # cv2.imshow("Original", cv_image)
+            #     cv2.imshow("MASK", mask)
+            #     #cv2.imshow("MASK2", mask2)
+            #     cv2.waitKey(1)
 
-                elif m['m00'] != 0:
-                    rospy.loginfo("Line Following using Cropped Image Blob")
-                    # elif m['m00'] != 0 and m2['m00'] != 0:
-                    cx, cy = m['m10']/m['m00'], m['m01']/m['m00']
-                    if m2['m00'] !=0 :
-                        cx2, cy2 = m2['m10']/m2['m00'], m2['m01']/m2['m00']
-                        cv2.circle(mask2,(int(cx2), int(cy2)), 10,(0,0,255),-1)
-                    else:
-                        cx2 = cx
+            #     self.whos_publishing = 1
+            #     self.line_follower_controller(cx,cx,width)
+            
+            if m['m00'] != 0 and self.whos_publishing != 3:
+                self.whos_publishing = 1
 
-                    cv2.circle(mask,(int(cx), int(cy)), 10,(0,0,255),-1)
-                    
-                    # cv2.imshow("Original", cv_image)
-                    cv2.imshow("MASK-CROP", mask)
-                    #cv2.imshow("MASK2", mask2)
-                    cv2.waitKey(1)
+                rospy.loginfo("Line Following using Cropped Image Blob")
+                # elif m['m00'] != 0 and m2['m00'] != 0:
+                cx, cy = m['m10']/m['m00'], m['m01']/m['m00']
+                
+                if m2['m00'] != 0:
+                    cx2, cy2 = m2['m10']/m2['m00'], m2['m01']/m2['m00']
+                    cv2.circle(mask2,(int(cx2), int(cy2)), 10,(0,0,255),-1)
+                else:
+                    cx2 = cx
 
-                    self.line_follower_controller(cx,cx2,width)
-                    
+                cv2.circle(mask,(int(cx), int(cy)), 10,(0,0,255),-1)
+                
+                # cv2.imshow("Original", hsv)
+                cv2.imshow("MASK-CROP-TOP", mask)
+                # cv2.imshow("MASK-CROP-BOTTOM", mask2)
+                cv2.waitKey(1)
+
+                self.line_follower_controller(cx,cx2,width)
+            
+            elif self.whos_publishing == 1:
+                self.whos_publishing = 0
+
+        elif self.whos_publishing == 1:
+            self.whos_publishing = 0
+        
     def clean_up(self):
-        self.moveTurtlebot3_object.clean_class()
         cv2.destroyAllWindows()
 
 def main():

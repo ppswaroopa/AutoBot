@@ -1,14 +1,13 @@
 <launch>
-  <include file="$(find aue_finals)/launch/continuous_detection.launch"/>
+  <include file="$(find aue_finals)/launch/continuous_detection.launch">
+  <arg name="camera_name" default="/raspicam_node" />
+  <arg name="image_topic" default="image/better" />
+  </include>
 
   <node pkg="aue_finals" type="AutonomousBot_real.py" name="autobot" output="screen" />
   
   <include file="$(find aue_finals)/launch/yolo_v2_tiny.launch">
-  <arg name="image" default="/raspicam_node/image" />
+  <arg name="image" default="/raspicam_node/image/better" />
   </include>
   
 </launch>
-
-
-
-
