@@ -11,10 +11,7 @@ from darknet_ros_msgs.msg import BoundingBoxes
 from apriltag_ros.msg import AprilTagDetectionArray
 
 from cv_bridge import CvBridge
-from move_robot import MoveTurtlebot3
 from time import time
-
-# rosrun image_transport republish compressed in:=raspicam_node/image raw out:=raspicam_node/image/better
 
 
 class TurtleBot(object):
@@ -24,7 +21,7 @@ class TurtleBot(object):
 
         self.bridge_object = CvBridge()
 
-        # rospy.Subscriber("/raspicam_node/image/better", Image, self.line_follower)
+        rospy.Subscriber("/raspicam_node/image_better", Image, self.line_follower)
         rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.stop_sign_detector)
         rospy.Subscriber("/scan", LaserScan, self.obstacle_avoidance)
         rospy.Subscriber("/tag_detections", AprilTagDetectionArray, self.april_tag_detector)
@@ -39,7 +36,7 @@ class TurtleBot(object):
         self.yolo               =   True    #  Flag for Stop Sign Detection using TinyYOLO
         self.whos_publishing    =   0       #  Flag for Controller Selection
 
-        self.stop_sign_distance              =   0       # For Stop Sign Detection
+        self.stop_sign_distance =   0       # For Stop Sign Detection
         self.cxlast_int         =   0       # For Line Follwer
         self.lasttime           =   0       # For Line Follwer
         
@@ -56,6 +53,7 @@ class TurtleBot(object):
 
     def clip(self, val, mx, mn=None):
         # Helper function for April Tag
+
         # clip val to range (mn, mx)
         # if mn not defined, clip val to range (-mx, mx)
         if mn == None:
@@ -64,13 +62,9 @@ class TurtleBot(object):
 
     def april_tag_detector(self, data):
         # April Tag Follower that is activated upon positive detection.
-        # Only works after the controller has stopped for STOP sign
-        # if no apriltag detected, make bool false, so botcontrol() is used instead
-        
-        # if (len(data.detections) > 0) and (self.yolo == False):
-        # if len(data.detections) > 0:
+
         if len(data.detections) > 0 and self.whos_publishing != 3:
-            rospy.loginfo("April T ag Detected")
+            rospy.loginfo("April Tag Detected")
 
             self.whos_publishing = 2
 
@@ -103,9 +97,9 @@ class TurtleBot(object):
                 if box.Class == "stop sign":
                     rospy.loginfo("STOP SIGN Detected")
                     rospy.loginfo(np.min(self.stop_sign_distance))
-                    if (np.mean(self.stop_sign_distance) < 0.75) and (np.mean(self.stop_sign_distance) > 0.5): # At the entrance value of mean is 0.27                        
+                    if (np.mean(self.stop_sign_distance) < 1) and (np.mean(self.stop_sign_distance) > 0.5):                     
                         
-                        self.whos_publishing = 3                    # need to stop for sign, take over control
+                        self.whos_publishing = 3  # Need to stop for sign, take over control
 
                         # wait 3 seconds
                         rospy.loginfo("Stopping for STOP SIGN")
@@ -116,23 +110,22 @@ class TurtleBot(object):
                             self.pub.publish(self.cmd)
 
                         
-                        self.whos_publishing = 1        # back into line following mode
+                        self.whos_publishing = 1  # Back into line following mode
                         rospy.loginfo("Proceeding from STOP SIGN")
-                        self.yolo = False #  Once stopped for STOP SIGN, the program will stop processing
+                        self.yolo = False  # Once stopped for STOP SIGN, the program will stop processing
 
     def obstacle_avoidance(self, scan_data):
         # Obstacle Avoidance based on LiDAR
-        ts = time()
 
         scd = scan_data.ranges
 
         # Calculating frontal values for STOP SIGN Detection
         scn = np.concatenate((scd[300:360], scd[0:30]))
-        # scn = np.array(scd[270:360])
         self.stop_sign_distance = scn[(scn>0.01) & (scn<3)]
         
         if self.whos_publishing == 0:
             rospy.loginfo('Working: Obstacle Avoidance Controller')
+
             # Front ahead distance measurement with noise filtering and respective ranges
             front1 = np.concatenate((scd[355:360], scd[0:6]))
             front1 = front1[(front1>0.01) & (front1<1)]
@@ -191,36 +184,32 @@ class TurtleBot(object):
             
             self.cmd.angular.z = z
             self.pub.publish(self.cmd)
-        rospy.loginfo(time() - ts)
 
     def line_follower_controller(self, cx, cx2, width):
-
+        # Controller for Line Follwer. Gets called based on processing results from line_follwer function
         self.whos_publishing = 1
 
         # PD controller, works in gazebo to follow line relatively in centre
         twist_object = Twist()
         twist_object.linear.x = 0.1
-        cx2 = cx
+        cx2 = cx  # Used only in Simulation. Found to be unncessary in Real world.
         #######Extrapolation########
-        x_int = cx - 3*(cx2 - cx)
+        x_int = cx - 2*(cx2 - cx)
         ############################
       
-        p = max(-0.28, min(0.28, ((width/2) - x_int)/3000))
-        
+        p = max(-0.28, min(0.28, ((width/2) - x_int)/1500))*1.2
         d = max(-0.28, min(0.28, (self.cxlast_int-x_int)/(time() - self.lasttime)*1.2*1e7))
-     
-        twist_object.angular.z = p+d
-        
-        self.cxlast_int = x_int
-        # end controller
-        # rospy.loginfo("ANGULAR VALUE SENT===>"+str(twist_object.angular.z))
 
+        twist_object.angular.z = p+d
+        self.cxlast_int = x_int
         self.pub.publish(twist_object)
 
     def line_follower(self, data):
         # Line Following using Camera
 
-        # Check for blob formation in whole image
+        # Checks for the number of positive pixels in a HSV Range mask for the lower
+        # half portion of the image.
+
         # We select bgr8 because its the OpneCV encoding by default
         cv_image = self.bridge_object.imgmsg_to_cv2(data, desired_encoding="bgr8")
 
@@ -233,29 +222,15 @@ class TurtleBot(object):
         crop_img = hsv[int(height/2):int(height)][1:int(width)]
 
         # Threshold the HSV image to get only yellow colors
-        lower_yellow = np.array([21, 35, 40])
-        upper_yellow = np.array([97, 154, 204])
-
-        # 38, 20.4, 97
-        # 33.5, 140, 105
-        # 27, 64, 77
-        # 33, 125, 77
+        lower_yellow = np.array([16, 36, 52])
+        upper_yellow = np.array([85, 154, 255])
 
         mask = cv2.inRange(crop_img, lower_yellow, upper_yellow)
         white_sum = int(np.sum(mask)/255)
-        rospy.loginfo(white_sum)
+        # rospy.loginfo("Number of Positive Pixels: "+str(white_sum))
 
         # count pixels, if not noise, but actually line potentially
-        if white_sum > 30000:
-
-            # # Calculate centroid of the blob of binary image using ImageMoments
-            # m_main = cv2.moments(mask, False)
-
-            # if m_main['m00'] == 0:                  # if moment is not empty
-            #     if self.whos_publishing == 1:       
-            #         self.whos_publishing = 0
-
-            # elif m_main['m00'] != 0:
+        if white_sum > 1500:
             
             crop_img = hsv[int(height*.8):int(height)][1:int(width)]
             crop_img2 = hsv[int(height*.9):int(height)][1:int(width)]
@@ -266,23 +241,8 @@ class TurtleBot(object):
             # Calculate centroid of the blob of binary image using ImageMoments
             m = cv2.moments(mask, False)
             m2 = cv2.moments(mask2, False)
-            
-                # if m['m00'] == 0 or m2['m00'] == 0:
-            # if m['m00'] == 0:
 
-            #     rospy.loginfo("Line Following using Full Image Blob")
-            #     # use the values from the full image
-            #     cx, cy = m_main['m10']/m_main['m00'], m_main['m01']/m_main['m00']
-
-            #     cv2.circle(mask,(int(cx), int(cy)), 10,(0,0,255),-1)
-            #     # cv2.circle(mask2,(int(cx2), int(cy2)), 10,(0,0,255),-1)
-            #     # cv2.imshow("Original", cv_image)
-            #     cv2.imshow("MASK", mask)
-            #     #cv2.imshow("MASK2", mask2)
-            #     cv2.waitKey(1)
-
-            #     self.whos_publishing = 1
-            #     self.line_follower_controller(cx,cx,width)
+            rospy.loginfo("Line Following using Half Image Blob")
             
             if m['m00'] != 0 and self.whos_publishing != 3:
                 self.whos_publishing = 1
@@ -316,9 +276,9 @@ class TurtleBot(object):
         cv2.destroyAllWindows()
 
 def main():
-    rospy.init_node('autobot', anonymous=True) # Initialize the node
+    rospy.init_node('autobot', anonymous=True)  # Initialize the node
 
-    tb3_burger = TurtleBot() # Create object of the main class
+    tb3_burger = TurtleBot()  # Create object of the main class
     rate = rospy.Rate(5)
 
     ctrl_c = False
