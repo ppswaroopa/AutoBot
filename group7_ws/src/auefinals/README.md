@@ -1,29 +1,135 @@
 
-## AuE893 Final Project Gazebo Model
+# **AuE8930 Final Project**
 
-Dependencies that are not included:
+Group Members:
 
-* The TB3 packages
+1. Pranava Swaroopa | [GitHub](https://github.com/ppswaroopa)
 
-To bring up the Gazebo Model:
+2. Tanmay Chhatbar | [GitHub](https://github.com/TanmayChhatbar)
 
-roslaunch aue_finals turtlebot3_autonomy_finals.launch
+3. Prasanna Gupta | [GitHub](https://github.com/hthalla)
 
+4. Zainul Belgaumwala | [GitHub](https://github.com/zainul-b)
 
-There are 3 sections to this project:
+## **Project Description: Autonomous navigation of Turtlebot**
 
-* Task 1: Wall following/Obstacle avoidance - The Turtlebot starts here. It must successfully follow the wall and avoid the obstacles until it reaches the yellow line.
-* Task 2:
-- Line following - The Turtlebot must successfully follow the yellow line.
-- Stop Sign detection - While navigating the yellow line, the the Turtlebot should stop at the stop sign for 3 seconds before continuing. The stop-sign will be detected by TinyYOLO.
-* Task 3: AprilTag tracking - Spawn another TB3 in the environment past the line. Attach an AprilTag onto the robot. You must teleop this TB3 (there are several packages available online, to enable teleop terminals; use the namespace concept to send seperate /cmd_vel values to seperate robots), and the preceding TB3 should follow it.
+* ## Task 1: Wall following/Obstacle avoidance
 
+* Successfully follow the wall and avoid the obstacles until it reaches the yellow line.
 
-This model contains code from the following repositories:
+* ## Task 2: Line following and Stop Sign Detection
 
-* (TB3 model + inpsiration) TB3 Autorace: https://github.com/ROBOTIS-GIT/turtlebot3_autorace_2020.git
+* Successfully follow the yellow line.
+* While navigating the yellow line, the the Turtlebot should stop at the stop sign for 3 seconds before continuing. The stop-sign will be detected by TinyYOLO.
 
-Maintainers:
+* ## Task 3: AprilTag tracking
 
-* Huzefa Kagalwala (TA)
-* Utkarsha Chaudhari (TA)
+* Spawn and AprilTag in the simulation world and the Turtlebot should track it.
+
+## **Development environment**
+
+* OS: Ubuntu 20.04
+* ROS: ROS 1 - Noetic
+* Turtlebot 3 Burger - ROS installed, Camera Installed, Setup and Calibrated.
+
+The catkin workspace aue-finals reside has all external and internal dependencies.
+
+### External Dependencies (Submodules in this git repo)
+
+1. apriltag
+2. aprilrag_ros
+3. darknet_ros
+4. turtlebot3_simulations
+
+## **How to Run**
+
+Clone the repo:
+
+```bash
+git clone --recurse-submodules https://github.com/ppswaroopa/Aue8230Spring2022_Group7.git
+cd group7_ws
+catkin build -DCMAKE_BUILD_TYPE=Release
+```
+
+Note
+
+* *For working with darknet_ros you will need to have nvidia-toolkit installed on your system. Otherwise building of darknet_ros will fail.*
+
+* *apriltag and apriltag_ros packages just need to be built*
+
+There are TWO main launch files, One for running it in simulation and the other in real world.
+
+The launch files evoke same nodes but only differ in the subscribers.
+
+* In simulation the camera topic is
+
+```bash
+/camera/rgb/image
+```
+
+* In the real world based on the camera publisher this topic changes. In our case it was
+
+```bash
+/raspicam_node/image
+```
+
+* In the real world due to network constraints the 1280x720 image cannot be processed at processing speeds at par with simulation. This meant using a smaller image dimension and compressed images. We utilized the image_transport method to compress and republish the images. In our case the images are available at
+
+```bash
+/raspicam_node/image_better
+```
+
+### Simulation
+
+To launch the "autobot" node in simulation run:
+
+```bash
+roslaunch aue_finals simulation_integration_turtlebot3_autonomy_final.launch
+```
+
+### Real World
+
+To launch the "autobot" node in realworld run:
+
+```bash
+roslaunch aue_finals real_integration_turtlebot3_autonomy_final.launch
+```
+
+## **Demo**
+
+### Simulation Run
+
+1. Wall following/Obstacle avoidance:
+
+```bash
+roslaunch aue_finals lidar_turtlebot3_autonomy_final.launch
+```
+
+![GitHub](https://github.com/ppswaroopa)
+
+2. Line following and Stop Sign Detection:
+
+```bash
+roslaunch aue_finals lidar_turtlebot3_autonomy_final.launch
+```
+
+![GitHub](https://github.com/ppswaroopa)
+
+3. AprilTag tracking:
+
+```bash
+roslaunch aue_finals lidar_turtlebot3_autonomy_final.launch
+```
+
+![GitHub](https://github.com/ppswaroopa)
+
+### Real World Run
+
+#### Autobot in Action
+
+```bash
+roslaunch aue_finals real_integration_turtlebot3_autonomy_final.launch
+```
+
+![GitHub](https://github.com/ppswaroopa)
+
