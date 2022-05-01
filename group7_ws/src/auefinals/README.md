@@ -30,9 +30,14 @@ Group Members:
 
 * OS: Ubuntu 20.04
 * ROS: ROS 1 - Noetic
-* Turtlebot 3 Burger - ROS installed, Camera Installed, Setup and Calibrated.
+* Robot: Turtlebot 3 Burger - ROS installed, Camera Installed, Setup and Calibrated.
 
 The catkin workspace aue-finals reside has all external and internal dependencies.
+
+### **Gazebo World**
+
+![Gazebo World](/auefinals/aue_finals/screenshots/sim_world_1.png)
+![Gazebo World](/auefinals/aue_finals/screenshots/sim_world_2.png)
 
 ### External Dependencies (Submodules in this git repo)
 
@@ -41,9 +46,11 @@ The catkin workspace aue-finals reside has all external and internal dependencie
 3. darknet_ros
 4. turtlebot3_simulations
 
+---
+
 ## **How to Run**
 
-Clone the repo:
+### **Clone the repo:**
 
 ```bash
 git clone --recurse-submodules https://github.com/ppswaroopa/Aue8230Spring2022_Group7.git
@@ -56,6 +63,21 @@ Note
 * *For working with darknet_ros you will need to have nvidia-toolkit installed on your system. Otherwise building of darknet_ros will fail.*
 
 * *apriltag and apriltag_ros packages just need to be built*
+
+### **Turtlebot Setup:**
+
+* Setup the robot using: [Quick Start Guide](https://emanual.robotis.com/docs/en/platform/turtlebot3/quick-start/)
+* Setup camera access on the Turtlebot 3 Burger.
+* Calibrate the camera following the instruction given on this link: [Camera Calibraiton](https://emanual.robotis.com/docs/en/platform/turtlebot3/autonomous_driving/#camera-calibration)
+* Brinup Turtlebot and Camera. *You can edit the bringup launch file to load the camera module with it*
+
+```bash
+roslaunch turtlebot3_bringup turtlebot3_robot.launch
+```
+
+---
+
+### **Running Code**
 
 There are TWO main launch files, One for running it in simulation and the other in real world.
 
@@ -95,9 +117,13 @@ To launch the "autobot" node in realworld run:
 roslaunch aue_finals real_integration_turtlebot3_autonomy_final.launch
 ```
 
+---
+
 ## **Demo**
 
 ### Simulation Run
+
+In simulation you can run all the tasks seperately. Hence the launch files will ensure the bot starts at the right spot to start that task. Corresoponding scripts implement the task independent of other tasks.
 
 1. Wall following/Obstacle avoidance:
 
@@ -105,23 +131,32 @@ roslaunch aue_finals real_integration_turtlebot3_autonomy_final.launch
 roslaunch aue_finals lidar_turtlebot3_autonomy_final.launch
 ```
 
-![GitHub](https://github.com/ppswaroopa)
+![Wall Following](/auefinals/aue_finals/screenshots/Wall%20Following.png)
+![Obstacle Avoidance](/auefinals/aue_finals/screenshots/Obstacle%20Avoidance.png)
 
-2. Line following and Stop Sign Detection:
-
-```bash
-roslaunch aue_finals lidar_turtlebot3_autonomy_final.launch
-```
-
-![GitHub](https://github.com/ppswaroopa)
-
-3. AprilTag tracking:
+2. Line following:
 
 ```bash
-roslaunch aue_finals lidar_turtlebot3_autonomy_final.launch
+roslaunch aue_finals follow_line_turtlebot3_autonomy_final.launch
 ```
 
-![GitHub](https://github.com/ppswaroopa)
+![Line Following](/auefinals/aue_finals/screenshots/Line%20Follower.png)
+
+3. Stop Sign Detection:
+
+```bash
+roslaunch aue_finals stop_sign_turtlebot3_autonomy_final.launch
+```
+
+![Stop Sign Detection](/auefinals/aue_finals/screenshots/Stop%20Sign%20Recognition.png)
+
+4. AprilTag tracking:
+
+```bash
+roslaunch aue_finals april_tag_turtlebot3_autonomy_final.launch
+```
+
+![April Tag Tracking](/auefinals/aue_finals/screenshots/April%20Tag%20Tracking.png)
 
 ### Real World Run
 
@@ -131,5 +166,6 @@ roslaunch aue_finals lidar_turtlebot3_autonomy_final.launch
 roslaunch aue_finals real_integration_turtlebot3_autonomy_final.launch
 ```
 
-![GitHub](https://github.com/ppswaroopa)
+## **Report**
 
+Final Report submitted for Course credit is uploaded here.
