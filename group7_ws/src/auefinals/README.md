@@ -121,6 +121,8 @@ roslaunch aue_finals real_integration_turtlebot3_autonomy_final.launch
 
 ## **Demo**
 
+[Final Demo on YouTube](https://youtu.be/YXchdEtqzsE)
+
 ### Simulation Run
 
 In simulation you can run all the tasks seperately. Hence the launch files will ensure the bot starts at the right spot to start that task. Corresoponding scripts implement the task independent of other tasks.
@@ -168,4 +170,4 @@ roslaunch aue_finals real_integration_turtlebot3_autonomy_final.launch
 
 ## **Report**
 
-Final Report submitted for Course credit is uploaded here.
+Final Report submitted for Course credit is uploaded [here](https://drive.google.com/file/d/1VUZHVxMLVfufkPdMCAvcL_gCtVaOL2EZ/view?usp=sharing).
